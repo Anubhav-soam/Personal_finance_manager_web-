@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Client Financial Profiling</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+  <div class="bg"></div>
+  <main class="app">
+    <header class="topbar">
+      <h1>Client Financial Profiling Dashboard</h1>
+      <p>Plan, simulate, and visualize your complete financial journey.</p>
+      <div class="actions">
+        <button id="export_state">Export Data</button>
+        <label class="import-btn">Import Data<input id="import_state" type="file" accept="application/json" hidden></label>
+        <button id="reset_state">Reset All</button>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="profile">👤 Client Profile</button>
+      <button class="tab" data-tab="goals">📈 Personal Goals</button>
+      <button class="tab" data-tab="planning">📊 Financial Planning</button>
+    </nav>
+
+    <section id="profile" class="panel active"></section>
+    <section id="goals" class="panel"></section>
+    <section id="planning" class="panel"></section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
