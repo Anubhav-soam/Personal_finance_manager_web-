@@ -1,0 +1,40 @@
+:root {
+  --bg1: #060b18;
+  --bg2: #0f1f3c;
+  --bg3: #1f4a8a;
+  --card: rgba(255,255,255,0.92);
+  --text: #0f172a;
+  --muted: #334155;
+  --accent: #2563eb;
+  --ok: #16a34a;
+  --bad: #dc2626;
+}
+*{box-sizing:border-box}
+body { margin:0; font-family: Inter, system-ui, Arial; color:var(--text); background:#020617; }
+.bg { position:fixed; inset:0; background: radial-gradient(circle at 10% 10%, #3b82f6 0%, transparent 35%), radial-gradient(circle at 90% 0%, #22d3ee55 0%, transparent 25%), linear-gradient(160deg, var(--bg1), var(--bg2) 50%, var(--bg3)); z-index:-1; }
+.app { max-width: 1400px; margin: 20px auto; padding: 16px; }
+.topbar { color: white; margin-bottom: 14px; }
+.topbar h1 { margin:0; font-size: 1.8rem; }
+.topbar p { margin: 4px 0 0; opacity: .85; }
+.tabs { display:flex; gap:8px; margin-bottom: 14px; }
+.tab { border:1px solid #93c5fd55; background:#0b1a34cc; color:white; padding:10px 14px; border-radius:10px; cursor:pointer; }
+.tab.active { background:#2563eb; }
+.panel{ display:none; }
+.panel.active{ display:block; }
+.card { background: var(--card); border:1px solid #e2e8f0; border-radius:12px; padding:14px; margin-bottom:12px; }
+.grid{ display:grid; gap:10px; }
+.g2{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+.g3{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+.g4{ grid-template-columns:repeat(4,minmax(0,1fr)); }
+input,select,button{ width:100%; padding:8px; border-radius:8px; border:1px solid #cbd5e1; }
+button.primary{ background:var(--accent); color:#fff; border:none; cursor:pointer; }
+.table { width:100%; border-collapse: collapse; font-size:.92rem; }
+.table th,.table td{ border-bottom:1px solid #e2e8f0; padding:8px; text-align:left; }
+.metric { background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:10px; }
+.metric h4 { margin:0; font-size: .85rem; color:var(--muted); }
+.metric p { margin:4px 0 0; font-weight:700; }
+.success { color:var(--ok); font-weight:700; }
+.error { color:var(--bad); font-weight:700; }
+.chart-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.chart{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:8px; min-height:320px; }
+@media (max-width: 900px){ .g4,.g3,.g2,.chart-grid{ grid-template-columns:1fr; } }
