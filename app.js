@@ -27,7 +27,12 @@ function renderProfile(){
   </div><div style='margin-top:8px'><button class='primary' id='add_family'>Add Family Member</button></div>
   <table class='table'><tr><th>Name</th><th>Relation</th><th>DOB</th><th>Age</th><th>Gender</th><th></th></tr>${state.family.map((r,i)=>`<tr><td>${r.name}</td><td>${r.relation}</td><td>${r.dob||''}</td><td>${r.age}</td><td>${r.gender}</td><td><button data-del-family='${i}'>❌</button></td></tr>`).join('')}</table></div>
 
-  <div class='card'><h3>Earning Members</h3><div class='grid g4'><input id='i_name' placeholder='Name'><input id='i_age' type='number' min='18' max='100' placeholder='Age'><input id='i_income' type='number' step='5000' placeholder='Annual Income'><button class='primary' id='add_income'>Add Income</button></div>
+  <div class='card'><h3>Earning Members</h3><div class='grid g4'>
+  <select id='i_member'>${state.family.length ? state.family.map((f, i) => `<option value='${i}'>${f.name} (${f.relation})</option>`).join('') : "<option value=''>Add family members first</option>"}</select>
+  <input id='i_age' type='number' min='18' max='100' placeholder='Age' value='${state.family[0]?.age ?? ""}' readonly>
+  <input id='i_income' type='number' step='5000' placeholder='Annual Income'>
+  <button class='primary' id='add_income' ${state.family.length ? "" : "disabled"}>Add Income</button>
+  </div>
   <table class='table'><tr><th>Name</th><th>Age</th><th>Income</th><th></th></tr>${state.income.map((r,i)=>`<tr><td>${r.name}</td><td>${r.age}</td><td>${fmt(r.income)}</td><td><button data-del-income='${i}'>❌</button></td></tr>`).join('')}</table>
   <div class='metric'><h4>Total Annual Income</h4><p>${fmt(totalIncome)}</p></div></div>
 
@@ -42,12 +47,27 @@ function renderProfile(){
 
   document.getElementById('add_family').onclick=()=>{ const name=document.getElementById('f_name').value.trim(); if(!name)return; const dob=document.getElementById('f_dob').value; state.family.push({name, relation:document.getElementById('f_rel').value, dob, age: dob ? new Date().getFullYear()-new Date(dob).getFullYear():0, gender:document.getElementById('f_gender').value}); renderAll(); };
   document.querySelectorAll('[data-del-family]').forEach(b=>b.onclick=()=>{ state.family.splice(Number(b.dataset.delFamily),1); renderAll(); });
-  document.getElementById('add_income').onclick=()=>{ const name=document.getElementById('i_name').value.trim(), age=num('i_age'), income=num('i_income'); if(!name) return; state.income.push({name,age,income}); renderAll(); };
+  const memberSelect = document.getElementById('i_member');
+  const ageInput = document.getElementById('i_age');
+  if (memberSelect) {
+    memberSelect.onchange = () => {
+      const idx = Number(memberSelect.value);
+      ageInput.value = Number.isInteger(idx) && state.family[idx] ? state.family[idx].age : '';
+    };
+  }
+  document.getElementById('add_income').onclick=()=>{
+    const idx = Number(document.getElementById('i_member').value);
+    if (!Number.isInteger(idx) || !state.family[idx]) return;
+    const familyMember = state.family[idx];
+    const income=num('i_income');
+    state.income.push({name: familyMember.name, age: familyMember.age, income});
+    renderAll();
+  };
   document.querySelectorAll('[data-del-income]').forEach(b=>b.onclick=()=>{ state.income.splice(Number(b.dataset.delIncome),1); renderAll(); });
-  document.querySelectorAll('[data-exp]').forEach(i=>i.oninput=()=>{ state.expenseValues[Number(i.dataset.exp)] = Number(i.value||0); renderAll(); });
-  document.querySelectorAll('[data-loan-amt]').forEach(i=>i.oninput=()=>{ state.loanData[Number(i.dataset.loanAmt)].amount=Number(i.value||0); renderAll(); });
-  document.querySelectorAll('[data-loan-emi]').forEach(i=>i.oninput=()=>{ state.loanData[Number(i.dataset.loanEmi)].emi=Number(i.value||0); renderAll(); });
-  document.querySelectorAll('[data-loan-date]').forEach(i=>i.oninput=()=>{ const idx=Number(i.dataset.loanDate); state.loanData[idx].endDate=i.value; const d=(new Date(i.value)-new Date())/(1000*60*60*24); state.loanData[idx].yearsLeft=Math.max(0,Math.round((d/365)*10)/10); renderAll(); });
+  document.querySelectorAll('[data-exp]').forEach(i=>i.onchange=()=>{ state.expenseValues[Number(i.dataset.exp)] = Number(i.value||0); renderAll(); });
+  document.querySelectorAll('[data-loan-amt]').forEach(i=>i.onchange=()=>{ state.loanData[Number(i.dataset.loanAmt)].amount=Number(i.value||0); renderAll(); });
+  document.querySelectorAll('[data-loan-emi]').forEach(i=>i.onchange=()=>{ state.loanData[Number(i.dataset.loanEmi)].emi=Number(i.value||0); renderAll(); });
+  document.querySelectorAll('[data-loan-date]').forEach(i=>i.onchange=()=>{ const idx=Number(i.dataset.loanDate); state.loanData[idx].endDate=i.value; const d=(new Date(i.value)-new Date())/(1000*60*60*24); state.loanData[idx].yearsLeft=Math.max(0,Math.round((d/365)*10)/10); renderAll(); });
 
   Plotly.newPlot('c_income',[{type:'pie',labels:['Expenses','EMI','Savings'],values:[totalExpense,totalEmi,Math.max(0,net)],hole:.5}],{margin:{t:20,b:20,l:20,r:20}});
   const catMap={}; state.expenseMaster.forEach((r,i)=>catMap[r[0]]=(catMap[r[0]]||0)+Number(state.expenseValues[i]||0));
@@ -77,12 +97,12 @@ function renderGoals(){
   <div class='card'><h3>📈 Goal Visualization Dashboard</h3><div class='grid g2'><div id='g_pie'></div><div id='g_bar'></div></div><div id='g_area'></div></div>
   <div class='card'><h3>📆 Year-wise SIP Requirement Schedule</h3><div id='year_wrap'></div></div>`;
 
-  document.getElementById('infl').oninput=()=>{state.inflation=Number(document.getElementById('infl').value||5)/100; renderAll();};
-  document.getElementById('ann_return').oninput=()=>{state.annualReturn=Number(document.getElementById('ann_return').value||12)/100; renderAll();};
-  document.getElementById('cur_age').oninput=()=>{state.currentAge=Number(document.getElementById('cur_age').value||30); renderAll();};
-  document.getElementById('ret_age').oninput=()=>{state.retirementAge=Number(document.getElementById('ret_age').value||60); renderAll();};
-  document.querySelectorAll('[data-goal-amt]').forEach(i=>i.oninput=()=>{state.goalData[Number(i.dataset.goalAmt)].present=Number(i.value||0); renderAll();});
-  document.querySelectorAll('[data-goal-yrs]').forEach(i=>i.oninput=()=>{state.goalData[Number(i.dataset.goalYrs)].years=Number(i.value||0); renderAll();});
+  document.getElementById('infl').onchange=()=>{state.inflation=Number(document.getElementById('infl').value||5)/100; renderAll();};
+  document.getElementById('ann_return').onchange=()=>{state.annualReturn=Number(document.getElementById('ann_return').value||12)/100; renderAll();};
+  document.getElementById('cur_age').onchange=()=>{state.currentAge=Number(document.getElementById('cur_age').value||30); renderAll();};
+  document.getElementById('ret_age').onchange=()=>{state.retirementAge=Number(document.getElementById('ret_age').value||60); renderAll();};
+  document.querySelectorAll('[data-goal-amt]').forEach(i=>i.onchange=()=>{state.goalData[Number(i.dataset.goalAmt)].present=Number(i.value||0); renderAll();});
+  document.querySelectorAll('[data-goal-yrs]').forEach(i=>i.onchange=()=>{state.goalData[Number(i.dataset.goalYrs)].years=Number(i.value||0); renderAll();});
 
   const nz=rows.filter(r=>r.future>0);
   Plotly.newPlot('g_pie',[{type:'pie',labels:nz.map(r=>r.Goal),values:nz.map(r=>r.future),hole:.55,textinfo:'percent+label'}],{title:'Future Corpus Allocation by Goal',height:380});
@@ -113,9 +133,9 @@ function renderPlanning(){
   <div class='card'><h3>📊 Wealth & Cashflow Charts</h3><div class='grid g2'><div id='p_line'></div><div id='p_bar'></div></div></div>
   <div class='card'><h3>🎯 Goal & Retirement Readiness</h3><div class='grid g3'><div class='metric'><h4>Total Goal Corpus</h4><p>${fmt(totalGoal)}</p></div><div class='metric'><h4>Retirement Target</h4><p>${fmt(ret)}</p></div><div class='metric'><h4>Projected Corpus</h4><p>${fmt(final)}</p></div></div><p class='${final>=totalGoal?'success':'error'}'>${final>=totalGoal?'✅ All financial goals including retirement are fully funded.':`⚠️ Shortfall of ${fmt(totalGoal-final)}. Increase SIP or delay goals.`}</p></div>`;
 
-  document.getElementById('start_corpus').oninput=()=>{state.startCorpus=num('start_corpus'); renderAll();};
-  document.getElementById('plan_ret').oninput=()=>{state.annualReturn=num('plan_ret')/100; renderAll();};
-  document.getElementById('plan_sip').oninput=()=>{state.sipAmount=num('plan_sip'); renderAll();};
+  document.getElementById('start_corpus').onchange=()=>{state.startCorpus=num('start_corpus'); renderAll();};
+  document.getElementById('plan_ret').onchange=()=>{state.annualReturn=num('plan_ret')/100; renderAll();};
+  document.getElementById('plan_sip').onchange=()=>{state.sipAmount=num('plan_sip'); renderAll();};
   document.getElementById('add_in').onclick=()=>{state.lumpsumIn.push({year:num('in_year'),amount:num('in_amt'),label:document.getElementById('in_label').value}); renderAll();};
   document.getElementById('add_out').onclick=()=>{state.lumpsumOut.push({year:num('out_year'),amount:num('out_amt'),label:document.getElementById('out_label').value}); renderAll();};
   Plotly.newPlot('p_line',[{type:'scatter',mode:'lines+markers',x:proj.map(x=>x.y),y:proj.map(x=>x.closing)}],{title:'Projected Portfolio Value (₹ in Cr)',height:340});
