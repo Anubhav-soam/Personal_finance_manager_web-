@@ -1,4 +1,6 @@
 const fmt = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+const STORAGE_KEY = 'cfp_dashboard_state_v1';
+let renderQueued = false;
 const state = {
   family: [], income: [],
   expenseMaster: [
@@ -12,7 +14,41 @@ const state = {
   lumpsumIn: [], lumpsumOut: [], inflation: 0.05, annualReturn: 0.12, currentAge: 30, retirementAge: 60, startCorpus: 0,
 };
 
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    if (saved && typeof saved === 'object') Object.assign(state, saved);
+  } catch (_) {}
+}
+function activeTab(){ return document.querySelector('.tab.active')?.dataset.tab || 'profile'; }
 function bindTabs(){ document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>{ document.querySelectorAll('.tab,.panel').forEach(el=>el.classList.remove('active')); btn.classList.add('active'); document.getElementById(btn.dataset.tab).classList.add('active'); renderAll(); }); }
+function setupGlobalActions() {
+  document.getElementById('export_state').onclick = () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `client-financial-profile-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  document.getElementById('import_state').onchange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const imported = JSON.parse(await file.text());
+      if (imported && typeof imported === 'object') {
+        Object.assign(state, imported);
+        renderAll();
+      }
+    } catch (_) { alert('Invalid JSON file.'); }
+  };
+  document.getElementById('reset_state').onclick = () => {
+    if (!confirm('Reset all dashboard data?')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+  };
+}
 const num=(id)=>Number(document.getElementById(id)?.value||0);
 
 function renderProfile(){
@@ -78,9 +114,9 @@ function renderProfile(){
     renderAll();
   };
   document.querySelectorAll('[data-del-income]').forEach(b=>b.onclick=()=>{ state.income.splice(Number(b.dataset.delIncome),1); renderAll(); });
-  document.querySelectorAll('[data-exp]').forEach(i=>i.onchange=()=>{ state.expenseValues[Number(i.dataset.exp)] = Number(i.value||0); renderAll(); });
-  document.querySelectorAll('[data-loan-amt]').forEach(i=>i.onchange=()=>{ state.loanData[Number(i.dataset.loanAmt)].amount=Number(i.value||0); renderAll(); });
-  document.querySelectorAll('[data-loan-emi]').forEach(i=>i.onchange=()=>{ state.loanData[Number(i.dataset.loanEmi)].emi=Number(i.value||0); renderAll(); });
+  document.querySelectorAll('[data-exp]').forEach(i=>i.onchange=()=>{ state.expenseValues[Number(i.dataset.exp)] = Math.max(0, Number(i.value||0)); renderAll(); });
+  document.querySelectorAll('[data-loan-amt]').forEach(i=>i.onchange=()=>{ state.loanData[Number(i.dataset.loanAmt)].amount=Math.max(0, Number(i.value||0)); renderAll(); });
+  document.querySelectorAll('[data-loan-emi]').forEach(i=>i.onchange=()=>{ state.loanData[Number(i.dataset.loanEmi)].emi=Math.max(0, Number(i.value||0)); renderAll(); });
   document.querySelectorAll('[data-loan-date]').forEach(i=>i.onchange=()=>{ const idx=Number(i.dataset.loanDate); state.loanData[idx].endDate=i.value; const d=(new Date(i.value)-new Date())/(1000*60*60*24); state.loanData[idx].yearsLeft=Math.max(0,Math.round((d/365)*10)/10); renderAll(); });
 
   Plotly.newPlot('c_income',[{type:'pie',labels:['Expenses','EMI','Savings'],values:[totalExpense,totalEmi,Math.max(0,net)],hole:.58,marker:{colors:['#f97316','#ef4444','#22c55e']},textinfo:'label+percent',pull:[0.04,0.06,0.03]}],{paper_bgcolor:'#ffffff',plot_bgcolor:'#ffffff',margin:{t:30,b:20,l:20,r:20},showlegend:true});
@@ -111,12 +147,12 @@ function renderGoals(){
   <div class='card'><h3>📈 Goal Visualization Dashboard</h3><div class='grid g2'><div id='g_pie'></div><div id='g_bar'></div></div><div id='g_area'></div></div>
   <div class='card'><h3>📆 Year-wise SIP Requirement Schedule</h3><div id='year_wrap'></div></div>`;
 
-  document.getElementById('infl').onchange=()=>{state.inflation=Number(document.getElementById('infl').value||5)/100; renderAll();};
-  document.getElementById('ann_return').onchange=()=>{state.annualReturn=Number(document.getElementById('ann_return').value||12)/100; renderAll();};
+  document.getElementById('infl').onchange=()=>{state.inflation=Math.max(0, Number(document.getElementById('infl').value||5))/100; renderAll();};
+  document.getElementById('ann_return').onchange=()=>{state.annualReturn=Math.max(0, Number(document.getElementById('ann_return').value||12))/100; renderAll();};
   document.getElementById('cur_age').onchange=()=>{state.currentAge=Number(document.getElementById('cur_age').value||30); renderAll();};
   document.getElementById('ret_age').onchange=()=>{state.retirementAge=Number(document.getElementById('ret_age').value||60); renderAll();};
-  document.querySelectorAll('[data-goal-amt]').forEach(i=>i.onchange=()=>{state.goalData[Number(i.dataset.goalAmt)].present=Number(i.value||0); renderAll();});
-  document.querySelectorAll('[data-goal-yrs]').forEach(i=>i.onchange=()=>{state.goalData[Number(i.dataset.goalYrs)].years=Number(i.value||0); renderAll();});
+  document.querySelectorAll('[data-goal-amt]').forEach(i=>i.onchange=()=>{state.goalData[Number(i.dataset.goalAmt)].present=Math.max(0, Number(i.value||0)); renderAll();});
+  document.querySelectorAll('[data-goal-yrs]').forEach(i=>i.onchange=()=>{state.goalData[Number(i.dataset.goalYrs)].years=Math.max(0, Number(i.value||0)); renderAll();});
 
   const nz=rows.filter(r=>r.future>0);
   Plotly.newPlot('g_pie',[{type:'pie',labels:nz.map(r=>r.Goal),values:nz.map(r=>r.future),hole:.62,textinfo:'percent+label',marker:{line:{color:'#fff',width:2}}}],{title:'Future Corpus Allocation by Goal',height:380,paper_bgcolor:'#ffffff'});
@@ -147,14 +183,28 @@ function renderPlanning(){
   <div class='card'><h3>📊 Wealth & Cashflow Charts</h3><div class='grid g2'><div id='p_line'></div><div id='p_bar'></div></div></div>
   <div class='card'><h3>🎯 Goal & Retirement Readiness</h3><div class='grid g3'><div class='metric'><h4>Total Goal Corpus</h4><p>${fmt(totalGoal)}</p></div><div class='metric'><h4>Retirement Target</h4><p>${fmt(ret)}</p></div><div class='metric'><h4>Projected Corpus</h4><p>${fmt(final)}</p></div></div><p class='${final>=totalGoal?'success':'error'}'>${final>=totalGoal?'✅ All financial goals including retirement are fully funded.':`⚠️ Shortfall of ${fmt(totalGoal-final)}. Increase SIP or delay goals.`}</p></div>`;
 
-  document.getElementById('start_corpus').onchange=()=>{state.startCorpus=num('start_corpus'); renderAll();};
-  document.getElementById('plan_ret').onchange=()=>{state.annualReturn=num('plan_ret')/100; renderAll();};
-  document.getElementById('plan_sip').onchange=()=>{state.sipAmount=num('plan_sip'); renderAll();};
-  document.getElementById('add_in').onclick=()=>{state.lumpsumIn.push({year:num('in_year'),amount:num('in_amt'),label:document.getElementById('in_label').value}); renderAll();};
-  document.getElementById('add_out').onclick=()=>{state.lumpsumOut.push({year:num('out_year'),amount:num('out_amt'),label:document.getElementById('out_label').value}); renderAll();};
+  document.getElementById('start_corpus').onchange=()=>{state.startCorpus=Math.max(0, num('start_corpus')); renderAll();};
+  document.getElementById('plan_ret').onchange=()=>{state.annualReturn=Math.max(0, num('plan_ret'))/100; renderAll();};
+  document.getElementById('plan_sip').onchange=()=>{state.sipAmount=Math.max(0, num('plan_sip')); renderAll();};
+  document.getElementById('add_in').onclick=()=>{state.lumpsumIn.push({year:num('in_year'),amount:Math.max(0, num('in_amt')),label:document.getElementById('in_label').value}); renderAll();};
+  document.getElementById('add_out').onclick=()=>{state.lumpsumOut.push({year:num('out_year'),amount:Math.max(0, num('out_amt')),label:document.getElementById('out_label').value}); renderAll();};
   Plotly.newPlot('p_line',[{type:'scatter',mode:'lines+markers',x:proj.map(x=>x.y),y:proj.map(x=>x.closing),line:{color:'#10b981',width:3},marker:{size:7,color:'#047857'}}],{title:'Projected Portfolio Value (₹ in Cr)',height:340,paper_bgcolor:'#ffffff',xaxis:{gridcolor:'#e2e8f0'},yaxis:{gridcolor:'#e2e8f0'}});
   Plotly.newPlot('p_bar',[{type:'bar',x:proj.map(x=>x.y),y:proj.map(x=>x.sip+x.inflow-x.outflow),marker:{color:'#f59e0b'}}],{title:'Year-wise Net Investment (₹)',height:340,paper_bgcolor:'#ffffff',xaxis:{gridcolor:'#e2e8f0'},yaxis:{gridcolor:'#e2e8f0'}});
 }
 
-function renderAll(){ renderProfile(); renderGoals(); renderPlanning(); }
-bindTabs(); renderAll();
+function renderAll(){
+  saveState();
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => {
+    renderQueued = false;
+    const tab = activeTab();
+    if (tab === 'profile') renderProfile();
+    if (tab === 'goals') renderGoals();
+    if (tab === 'planning') renderPlanning();
+  });
+}
+loadState();
+bindTabs();
+setupGlobalActions();
+renderAll();

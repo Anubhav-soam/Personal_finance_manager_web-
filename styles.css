@@ -16,6 +16,9 @@ body { margin:0; font-family: Inter, system-ui, Arial; color:var(--text); backgr
 .topbar { color: white; margin-bottom: 14px; }
 .topbar h1 { margin:0; font-size: 1.8rem; }
 .topbar p { margin: 4px 0 0; opacity: .85; }
+.actions{ margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
+.actions button,.import-btn{ width:auto; background:#0b1a34cc; color:#fff; border:1px solid #93c5fd55; padding:8px 12px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; }
+.actions button:hover,.import-btn:hover{ background:#1e3a8a; }
 .tabs { display:flex; gap:8px; margin-bottom: 14px; }
 .tab { border:1px solid #93c5fd55; background:#0b1a34cc; color:white; padding:10px 14px; border-radius:10px; cursor:pointer; }
 .tab.active { background:#2563eb; }
