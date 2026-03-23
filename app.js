@@ -1,6 +1,22 @@
 const fmt = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 const STORAGE_KEY = 'cfp_dashboard_state_v1';
 let renderQueued = false;
+const parseDateInput = (value) => {
+  if (!value) return null;
+  const v = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const d = new Date(`${v}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const m = v.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (m) {
+    const d = new Date(`${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+const todayISO = () => new Date().toISOString().slice(0, 10);
 const state = {
   family: [], income: [],
   expenseMaster: [
@@ -8,7 +24,7 @@ const state = {
   ],
   expenseValues: Array(55).fill(0),
   loanMaster: ["Home Loan","Car Loan","Personal Loan","Education Loan","Gold Loan","Loan Against Property (LAP)","Business Loan","Credit Card Outstanding","Consumer Durable Loan","Other Loans"],
-  loanData: Array(10).fill(0).map(() => ({ amount: 0, emi: 0, endDate: new Date().toISOString().slice(0, 10), yearsLeft: 0 })),
+  loanData: Array(10).fill(0).map(() => ({ amount: 0, emi: 0, endDate: todayISO(), yearsLeft: 0 })),
   goalMaster: ["Buying Home","Upgrading to bigger home","Buying another home","Personal renovation","Child education","Higher education","Spouse personal requirement","Child Birth Planning","Self wedding Planning","Childs wedding planning","Buying a car","Buying a Two wheeler","Emergency fund","Medical Emergency","Parents Medical care","Retirement corpus","Early retirement","Post-retirement healthcare","Passive income generation","Starting a business"],
   goalData: Array(20).fill(0).map(() => ({ present: 0, years: 0, future: 0 })),
   lumpsumIn: [], lumpsumOut: [], inflation: 0.05, annualReturn: 0.12, currentAge: 30, retirementAge: 60, startCorpus: 0,
@@ -73,7 +89,7 @@ function renderProfile(){
   const p = document.getElementById('profile');
   p.innerHTML = `<div class='card'><h3>Family Profile</h3><div class='grid g4'>
     <input id='f_name' placeholder='Name'><select id='f_rel'><option>Head</option><option>Spouse</option><option>Son</option><option>Daughter</option></select>
-    <input id='f_dob' type='date'><select id='f_gender'><option>Male</option><option>Female</option></select>
+    <input id='f_dob' type='text' placeholder='YYYY-MM-DD or DD/MM/YYYY'><select id='f_gender'><option>Male</option><option>Female</option></select>
   </div><div style='margin-top:8px'><button class='primary' id='add_family'>Add Family Member</button></div>
   <table class='table'><tr><th>Name</th><th>Relation</th><th>DOB</th><th>Age</th><th>Gender</th><th></th></tr>${state.family.map((r,i)=>`<tr><td>${r.name}</td><td>${r.relation}</td><td>${r.dob||''}</td><td>${r.age}</td><td>${r.gender}</td><td><button data-del-family='${i}'>❌</button></td></tr>`).join('')}</table></div>
 
@@ -88,14 +104,14 @@ function renderProfile(){
 
   <div class='card'><h3>Monthly Expenses</h3>${expenseSections}<div class='metric'><h4>Total Monthly Expenses</h4><p>${fmt(totalExpense)}</p></div></div>
 
-  <div class='card'><h3>Current Loans</h3><table class='table'><tr><th>Loan</th><th>Amount</th><th>EMI</th><th>End Date</th><th>Years Left</th></tr>${state.loanMaster.map((l,i)=>`<tr><td>${l}</td><td><input type='number' step='10000' data-loan-amt='${i}' value='${state.loanData[i].amount}'></td><td><input type='number' step='1000' data-loan-emi='${i}' value='${state.loanData[i].emi}'></td><td><input type='date' data-loan-date='${i}' value='${state.loanData[i].endDate}'></td><td>${state.loanData[i].yearsLeft.toFixed(1)} yrs</td></tr>`).join('')}</table>
+  <div class='card'><h3>Current Loans</h3><table class='table'><tr><th>Loan</th><th>Amount</th><th>EMI</th><th>End Date</th><th>Years Left</th></tr>${state.loanMaster.map((l,i)=>`<tr><td>${l}</td><td><input type='number' step='10000' data-loan-amt='${i}' value='${state.loanData[i].amount}'></td><td><input type='number' step='1000' data-loan-emi='${i}' value='${state.loanData[i].emi}'></td><td><input type='text' data-loan-date='${i}' placeholder='YYYY-MM-DD / DD/MM/YYYY' value='${state.loanData[i].endDate}'></td><td>${state.loanData[i].yearsLeft.toFixed(1)} yrs</td></tr>`).join('')}</table>
   <div class='grid g2'><div class='metric'><h4>Total Loan Outstanding</h4><p>${fmt(state.loanData.reduce((a,b)=>a+b.amount,0))}</p></div><div class='metric'><h4>Total Monthly EMI</h4><p>${fmt(totalEmi)}</p></div></div></div>
 
   <div class='card'><h3>Scenario Planning Tiles</h3><div class='grid g4'><div class='metric'><h4>Income</h4><p>${fmt(monthlyIncome)}</p></div><div class='metric'><h4>Expenses</h4><p>${fmt(totalExpense)}</p></div><div class='metric'><h4>EMI</h4><p>${fmt(totalEmi)}</p></div><div class='metric'><h4>Net Income</h4><p>${fmt(net)}</p></div></div><p class='${net>=0?'success':'error'}'>Net Monthly Savings: ${fmt(net)}</p></div>
 
   <div class='chart-grid'><div class='chart'><h4>Income Utilization</h4><div id='c_income'></div></div><div class='chart'><h4>Expense Distribution</h4><div id='c_exp'></div></div><div class='chart'><h4>EMI Distribution</h4><div id='c_emi'></div></div></div>`;
 
-  document.getElementById('add_family').onclick=()=>{ const name=document.getElementById('f_name').value.trim(); if(!name)return; const dob=document.getElementById('f_dob').value; state.family.push({name, relation:document.getElementById('f_rel').value, dob, age: dob ? new Date().getFullYear()-new Date(dob).getFullYear():0, gender:document.getElementById('f_gender').value}); renderAll(); };
+  document.getElementById('add_family').onclick=()=>{ const name=document.getElementById('f_name').value.trim(); if(!name)return; const dob=document.getElementById('f_dob').value.trim(); const dobDate = parseDateInput(dob); state.family.push({name, relation:document.getElementById('f_rel').value, dob, age: dobDate ? new Date().getFullYear()-dobDate.getFullYear():0, gender:document.getElementById('f_gender').value}); renderAll(); };
   document.querySelectorAll('[data-del-family]').forEach(b=>b.onclick=()=>{ state.family.splice(Number(b.dataset.delFamily),1); renderAll(); });
   const memberSelect = document.getElementById('i_member');
   const ageInput = document.getElementById('i_age');
@@ -117,12 +133,12 @@ function renderProfile(){
   document.querySelectorAll('[data-exp]').forEach(i=>i.onchange=()=>{ state.expenseValues[Number(i.dataset.exp)] = Math.max(0, Number(i.value||0)); renderAll(); });
   document.querySelectorAll('[data-loan-amt]').forEach(i=>i.onchange=()=>{ state.loanData[Number(i.dataset.loanAmt)].amount=Math.max(0, Number(i.value||0)); renderAll(); });
   document.querySelectorAll('[data-loan-emi]').forEach(i=>i.onchange=()=>{ state.loanData[Number(i.dataset.loanEmi)].emi=Math.max(0, Number(i.value||0)); renderAll(); });
-  document.querySelectorAll('[data-loan-date]').forEach(i=>i.onchange=()=>{ const idx=Number(i.dataset.loanDate); state.loanData[idx].endDate=i.value; const d=(new Date(i.value)-new Date())/(1000*60*60*24); state.loanData[idx].yearsLeft=Math.max(0,Math.round((d/365)*10)/10); renderAll(); });
+  document.querySelectorAll('[data-loan-date]').forEach(i=>i.onchange=()=>{ const idx=Number(i.dataset.loanDate); state.loanData[idx].endDate=i.value.trim(); const parsed = parseDateInput(i.value); const d = parsed ? (parsed - new Date())/(1000*60*60*24) : 0; state.loanData[idx].yearsLeft=Math.max(0,Math.round((d/365)*10)/10); renderAll(); });
 
-  Plotly.newPlot('c_income',[{type:'pie',labels:['Expenses','EMI','Savings'],values:[totalExpense,totalEmi,Math.max(0,net)],hole:.58,marker:{colors:['#f97316','#ef4444','#22c55e']},textinfo:'label+percent',pull:[0.04,0.06,0.03]}],{paper_bgcolor:'#ffffff',plot_bgcolor:'#ffffff',margin:{t:30,b:20,l:20,r:20},showlegend:true});
+  Plotly.newPlot('c_income',[{type:'pie',labels:['Expenses','EMI','Savings'],values:[totalExpense,totalEmi,Math.max(0,net)],hole:.62,marker:{colors:['#ff5ca8','#8b5cf6','#00ffa3']},textfont:{color:'#dbeafe'},textinfo:'label+percent',pull:[0.04,0.06,0.03]}],{paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{color:'#dbeafe'},margin:{t:30,b:20,l:20,r:20},showlegend:true});
   const catMap={}; state.expenseMaster.forEach((r,i)=>catMap[r[0]]=(catMap[r[0]]||0)+Number(state.expenseValues[i]||0));
-  const cats=Object.keys(catMap).filter(k=>catMap[k]>0); Plotly.newPlot('c_exp',[{type:'pie',labels:cats,values:cats.map(c=>catMap[c]),hole:.58,textinfo:'percent+label',marker:{line:{color:'#fff',width:2}}}],{paper_bgcolor:'#ffffff',plot_bgcolor:'#ffffff',margin:{t:30,b:20,l:20,r:20}});
-  const emi = state.loanMaster.map((l,i)=>({loan:l,emi:state.loanData[i].emi})).filter(x=>x.emi>0); Plotly.newPlot('c_emi',[{type:'pie',labels:emi.map(x=>x.loan),values:emi.map(x=>x.emi),hole:.58,textinfo:'label+percent',marker:{line:{color:'#fff',width:2}}}],{paper_bgcolor:'#ffffff',plot_bgcolor:'#ffffff',margin:{t:30,b:20,l:20,r:20}});
+  const cats=Object.keys(catMap).filter(k=>catMap[k]>0); Plotly.newPlot('c_exp',[{type:'pie',labels:cats,values:cats.map(c=>catMap[c]),hole:.62,textfont:{color:'#dbeafe'},textinfo:'percent+label',marker:{line:{color:'#0f172a',width:2}}}],{paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{color:'#dbeafe'},margin:{t:30,b:20,l:20,r:20}});
+  const emi = state.loanMaster.map((l,i)=>({loan:l,emi:state.loanData[i].emi})).filter(x=>x.emi>0); Plotly.newPlot('c_emi',[{type:'pie',labels:emi.map(x=>x.loan),values:emi.map(x=>x.emi),hole:.62,textfont:{color:'#dbeafe'},textinfo:'label+percent',marker:{line:{color:'#0f172a',width:2}}}],{paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{color:'#dbeafe'},margin:{t:30,b:20,l:20,r:20}});
 }
 
 function buildAnalysis(){
@@ -155,16 +171,16 @@ function renderGoals(){
   document.querySelectorAll('[data-goal-yrs]').forEach(i=>i.onchange=()=>{state.goalData[Number(i.dataset.goalYrs)].years=Math.max(0, Number(i.value||0)); renderAll();});
 
   const nz=rows.filter(r=>r.future>0);
-  Plotly.newPlot('g_pie',[{type:'pie',labels:nz.map(r=>r.Goal),values:nz.map(r=>r.future),hole:.62,textinfo:'percent+label',marker:{line:{color:'#fff',width:2}}}],{title:'Future Corpus Allocation by Goal',height:380,paper_bgcolor:'#ffffff'});
-  Plotly.newPlot('g_bar',[{type:'bar',y:nz.map(r=>r.Goal),x:nz.map(r=>r.sip),orientation:'h',marker:{color:'#2563eb',line:{color:'#1e3a8a',width:1.2}}}],{title:'Monthly SIP Burden by Goal',height:380,paper_bgcolor:'#ffffff',xaxis:{gridcolor:'#dbeafe'},yaxis:{gridcolor:'#eff6ff'}});
+  Plotly.newPlot('g_pie',[{type:'pie',labels:nz.map(r=>r.Goal),values:nz.map(r=>r.future),hole:.66,textinfo:'percent+label',textfont:{color:'#dbeafe'},marker:{line:{color:'#0f172a',width:2}}}],{title:'Future Corpus Allocation by Goal',height:380,paper_bgcolor:'rgba(0,0,0,0)',font:{color:'#dbeafe'}});
+  Plotly.newPlot('g_bar',[{type:'bar',y:nz.map(r=>r.Goal),x:nz.map(r=>r.sip),orientation:'h',marker:{color:'#00d4ff',line:{color:'#7c3aed',width:1.2}}}],{title:'Monthly SIP Burden by Goal',height:380,paper_bgcolor:'rgba(0,0,0,0)',font:{color:'#dbeafe'},xaxis:{gridcolor:'#1e3a8a'},yaxis:{gridcolor:'#1e3a8a'}});
   const sorted=[...rows].sort((a,b)=>a.years-b.years); let c=0; const cum=sorted.map(r=>{c+=r.future;return c;});
-  Plotly.newPlot('g_area',[{type:'scatter',mode:'lines+markers',fill:'tozeroy',x:sorted.map(r=>r.years),y:cum,line:{color:'#7c3aed',width:3},fillcolor:'rgba(124,58,237,0.2)'}],{title:'Cumulative Corpus Required Over Time',height:340,paper_bgcolor:'#ffffff',xaxis:{gridcolor:'#e2e8f0'},yaxis:{gridcolor:'#e2e8f0'}});
+  Plotly.newPlot('g_area',[{type:'scatter',mode:'lines+markers',fill:'tozeroy',x:sorted.map(r=>r.years),y:cum,line:{color:'#00ffa3',width:3},marker:{color:'#67e8f9'},fillcolor:'rgba(0,255,163,0.2)'}],{title:'Cumulative Corpus Required Over Time',height:340,paper_bgcolor:'rgba(0,0,0,0)',font:{color:'#dbeafe'},xaxis:{gridcolor:'#1e3a8a'},yaxis:{gridcolor:'#1e3a8a'}});
 
   const maxYear=Math.max(...rows.map(r=>r.years));
   const yw=document.getElementById('year_wrap');
   if(maxYear>0){ const yrows=[]; for(let y=1;y<=maxYear;y++){ const sip=rows.filter(r=>r.years>=y).reduce((a,b)=>a+b.sip,0); yrows.push({y,active:rows.filter(r=>r.years>=y).length,sip}); }
     yw.innerHTML=`<table class='table'><tr><th>Year</th><th>Active Goals</th><th>Total Monthly SIP (₹)</th><th>Annual Investment (₹)</th></tr>${yrows.map(r=>`<tr><td>${r.y}</td><td>${r.active}</td><td>${fmt(r.sip)}</td><td>${fmt(r.sip*12)}</td></tr>`).join('')}</table><div id='y_bar'></div>`;
-    Plotly.newPlot('y_bar',[{type:'bar',x:yrows.map(r=>r.y),y:yrows.map(r=>r.sip),marker:{color:'#0ea5e9'}}],{title:'Year-wise Monthly SIP Burden (All Active Goals)',height:330,paper_bgcolor:'#ffffff',xaxis:{gridcolor:'#e2e8f0'},yaxis:{gridcolor:'#e2e8f0'}});
+    Plotly.newPlot('y_bar',[{type:'bar',x:yrows.map(r=>r.y),y:yrows.map(r=>r.sip),marker:{color:'#8b5cf6'}}],{title:'Year-wise Monthly SIP Burden (All Active Goals)',height:330,paper_bgcolor:'rgba(0,0,0,0)',font:{color:'#dbeafe'},xaxis:{gridcolor:'#1e3a8a'},yaxis:{gridcolor:'#1e3a8a'}});
   } else yw.innerHTML='<p>Enter at least one goal with timeline to see Year-wise SIP schedule.</p>';
 }
 
@@ -188,8 +204,8 @@ function renderPlanning(){
   document.getElementById('plan_sip').onchange=()=>{state.sipAmount=Math.max(0, num('plan_sip')); renderAll();};
   document.getElementById('add_in').onclick=()=>{state.lumpsumIn.push({year:num('in_year'),amount:Math.max(0, num('in_amt')),label:document.getElementById('in_label').value}); renderAll();};
   document.getElementById('add_out').onclick=()=>{state.lumpsumOut.push({year:num('out_year'),amount:Math.max(0, num('out_amt')),label:document.getElementById('out_label').value}); renderAll();};
-  Plotly.newPlot('p_line',[{type:'scatter',mode:'lines+markers',x:proj.map(x=>x.y),y:proj.map(x=>x.closing),line:{color:'#10b981',width:3},marker:{size:7,color:'#047857'}}],{title:'Projected Portfolio Value (₹ in Cr)',height:340,paper_bgcolor:'#ffffff',xaxis:{gridcolor:'#e2e8f0'},yaxis:{gridcolor:'#e2e8f0'}});
-  Plotly.newPlot('p_bar',[{type:'bar',x:proj.map(x=>x.y),y:proj.map(x=>x.sip+x.inflow-x.outflow),marker:{color:'#f59e0b'}}],{title:'Year-wise Net Investment (₹)',height:340,paper_bgcolor:'#ffffff',xaxis:{gridcolor:'#e2e8f0'},yaxis:{gridcolor:'#e2e8f0'}});
+  Plotly.newPlot('p_line',[{type:'scatter',mode:'lines+markers',x:proj.map(x=>x.y),y:proj.map(x=>x.closing),line:{color:'#00ffa3',width:3},marker:{size:7,color:'#67e8f9'}}],{title:'Projected Portfolio Value (₹ in Cr)',height:340,paper_bgcolor:'rgba(0,0,0,0)',font:{color:'#dbeafe'},xaxis:{gridcolor:'#1e3a8a'},yaxis:{gridcolor:'#1e3a8a'}});
+  Plotly.newPlot('p_bar',[{type:'bar',x:proj.map(x=>x.y),y:proj.map(x=>x.sip+x.inflow-x.outflow),marker:{color:'#ff5ca8'}}],{title:'Year-wise Net Investment (₹)',height:340,paper_bgcolor:'rgba(0,0,0,0)',font:{color:'#dbeafe'},xaxis:{gridcolor:'#1e3a8a'},yaxis:{gridcolor:'#1e3a8a'}});
 }
 
 function renderAll(){
