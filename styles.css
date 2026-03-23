@@ -37,4 +37,10 @@ button.primary{ background:var(--accent); color:#fff; border:none; cursor:pointe
 .error { color:var(--bad); font-weight:700; }
 .chart-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
 .chart{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:8px; min-height:320px; }
+.exp-group{ border:1px solid #dbeafe; border-radius:10px; margin-bottom:10px; overflow:hidden; background:#f8fbff; }
+.exp-group summary{ cursor:pointer; padding:10px 12px; font-weight:700; color:#1e3a8a; background:linear-gradient(90deg,#dbeafe,#eff6ff); }
+.exp-group[open] summary{ border-bottom:1px solid #bfdbfe; }
+.exp-group table{ margin:0; background:#fff; }
+.chart h4{ margin:6px 8px 0; color:#1d4ed8; }
+.chart, .card{ box-shadow:0 10px 24px rgba(15,23,42,.08); }
 @media (max-width: 900px){ .g4,.g3,.g2,.chart-grid{ grid-template-columns:1fr; } }

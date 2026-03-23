@@ -20,6 +20,20 @@ function renderProfile(){
   const totalExpense = state.expenseValues.reduce((a,b)=>a+Number(b||0),0);
   const totalEmi = state.loanData.reduce((a,b)=>a+Number(b.emi||0),0);
   const net = monthlyIncome-totalExpense-totalEmi;
+  const expenseGroups = state.expenseMaster.reduce((acc, [cat, sub], i) => {
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push({ sub, i });
+    return acc;
+  }, {});
+  const expenseSections = Object.entries(expenseGroups).map(([cat, rows]) => {
+    const subtotal = rows.reduce((a, r) => a + Number(state.expenseValues[r.i] || 0), 0);
+    return `<details class='exp-group' ${subtotal > 0 ? "open" : ""}>
+      <summary>${cat} — ${fmt(subtotal)}</summary>
+      <table class='table'><tr><th>Subcategory</th><th>Amount</th></tr>
+      ${rows.map(r => `<tr><td>${r.sub}</td><td><input type='number' data-exp='${r.i}' step='500' value='${state.expenseValues[r.i]}'></td></tr>`).join('')}
+      </table>
+    </details>`;
+  }).join('');
   const p = document.getElementById('profile');
   p.innerHTML = `<div class='card'><h3>Family Profile</h3><div class='grid g4'>
     <input id='f_name' placeholder='Name'><select id='f_rel'><option>Head</option><option>Spouse</option><option>Son</option><option>Daughter</option></select>
@@ -36,7 +50,7 @@ function renderProfile(){
   <table class='table'><tr><th>Name</th><th>Age</th><th>Income</th><th></th></tr>${state.income.map((r,i)=>`<tr><td>${r.name}</td><td>${r.age}</td><td>${fmt(r.income)}</td><td><button data-del-income='${i}'>❌</button></td></tr>`).join('')}</table>
   <div class='metric'><h4>Total Annual Income</h4><p>${fmt(totalIncome)}</p></div></div>
 
-  <div class='card'><h3>Monthly Expenses</h3><table class='table'><tr><th>Category</th><th>Subcategory</th><th>Amount</th></tr>${state.expenseMaster.map((e,i)=>`<tr><td>${e[0]}</td><td>${e[1]}</td><td><input type='number' data-exp='${i}' step='500' value='${state.expenseValues[i]}'></td></tr>`).join('')}</table><div class='metric'><h4>Total Monthly Expenses</h4><p>${fmt(totalExpense)}</p></div></div>
+  <div class='card'><h3>Monthly Expenses</h3>${expenseSections}<div class='metric'><h4>Total Monthly Expenses</h4><p>${fmt(totalExpense)}</p></div></div>
 
   <div class='card'><h3>Current Loans</h3><table class='table'><tr><th>Loan</th><th>Amount</th><th>EMI</th><th>End Date</th><th>Years Left</th></tr>${state.loanMaster.map((l,i)=>`<tr><td>${l}</td><td><input type='number' step='10000' data-loan-amt='${i}' value='${state.loanData[i].amount}'></td><td><input type='number' step='1000' data-loan-emi='${i}' value='${state.loanData[i].emi}'></td><td><input type='date' data-loan-date='${i}' value='${state.loanData[i].endDate}'></td><td>${state.loanData[i].yearsLeft.toFixed(1)} yrs</td></tr>`).join('')}</table>
   <div class='grid g2'><div class='metric'><h4>Total Loan Outstanding</h4><p>${fmt(state.loanData.reduce((a,b)=>a+b.amount,0))}</p></div><div class='metric'><h4>Total Monthly EMI</h4><p>${fmt(totalEmi)}</p></div></div></div>
@@ -69,10 +83,10 @@ function renderProfile(){
   document.querySelectorAll('[data-loan-emi]').forEach(i=>i.onchange=()=>{ state.loanData[Number(i.dataset.loanEmi)].emi=Number(i.value||0); renderAll(); });
   document.querySelectorAll('[data-loan-date]').forEach(i=>i.onchange=()=>{ const idx=Number(i.dataset.loanDate); state.loanData[idx].endDate=i.value; const d=(new Date(i.value)-new Date())/(1000*60*60*24); state.loanData[idx].yearsLeft=Math.max(0,Math.round((d/365)*10)/10); renderAll(); });
 
-  Plotly.newPlot('c_income',[{type:'pie',labels:['Expenses','EMI','Savings'],values:[totalExpense,totalEmi,Math.max(0,net)],hole:.5}],{margin:{t:20,b:20,l:20,r:20}});
+  Plotly.newPlot('c_income',[{type:'pie',labels:['Expenses','EMI','Savings'],values:[totalExpense,totalEmi,Math.max(0,net)],hole:.58,marker:{colors:['#f97316','#ef4444','#22c55e']},textinfo:'label+percent',pull:[0.04,0.06,0.03]}],{paper_bgcolor:'#ffffff',plot_bgcolor:'#ffffff',margin:{t:30,b:20,l:20,r:20},showlegend:true});
   const catMap={}; state.expenseMaster.forEach((r,i)=>catMap[r[0]]=(catMap[r[0]]||0)+Number(state.expenseValues[i]||0));
-  const cats=Object.keys(catMap).filter(k=>catMap[k]>0); Plotly.newPlot('c_exp',[{type:'pie',labels:cats,values:cats.map(c=>catMap[c]),hole:.5}],{margin:{t:20,b:20,l:20,r:20}});
-  const emi = state.loanMaster.map((l,i)=>({loan:l,emi:state.loanData[i].emi})).filter(x=>x.emi>0); Plotly.newPlot('c_emi',[{type:'pie',labels:emi.map(x=>x.loan),values:emi.map(x=>x.emi),hole:.5}],{margin:{t:20,b:20,l:20,r:20}});
+  const cats=Object.keys(catMap).filter(k=>catMap[k]>0); Plotly.newPlot('c_exp',[{type:'pie',labels:cats,values:cats.map(c=>catMap[c]),hole:.58,textinfo:'percent+label',marker:{line:{color:'#fff',width:2}}}],{paper_bgcolor:'#ffffff',plot_bgcolor:'#ffffff',margin:{t:30,b:20,l:20,r:20}});
+  const emi = state.loanMaster.map((l,i)=>({loan:l,emi:state.loanData[i].emi})).filter(x=>x.emi>0); Plotly.newPlot('c_emi',[{type:'pie',labels:emi.map(x=>x.loan),values:emi.map(x=>x.emi),hole:.58,textinfo:'label+percent',marker:{line:{color:'#fff',width:2}}}],{paper_bgcolor:'#ffffff',plot_bgcolor:'#ffffff',margin:{t:30,b:20,l:20,r:20}});
 }
 
 function buildAnalysis(){
@@ -105,16 +119,16 @@ function renderGoals(){
   document.querySelectorAll('[data-goal-yrs]').forEach(i=>i.onchange=()=>{state.goalData[Number(i.dataset.goalYrs)].years=Number(i.value||0); renderAll();});
 
   const nz=rows.filter(r=>r.future>0);
-  Plotly.newPlot('g_pie',[{type:'pie',labels:nz.map(r=>r.Goal),values:nz.map(r=>r.future),hole:.55,textinfo:'percent+label'}],{title:'Future Corpus Allocation by Goal',height:380});
-  Plotly.newPlot('g_bar',[{type:'bar',y:nz.map(r=>r.Goal),x:nz.map(r=>r.sip),orientation:'h'}],{title:'Monthly SIP Burden by Goal',height:380});
+  Plotly.newPlot('g_pie',[{type:'pie',labels:nz.map(r=>r.Goal),values:nz.map(r=>r.future),hole:.62,textinfo:'percent+label',marker:{line:{color:'#fff',width:2}}}],{title:'Future Corpus Allocation by Goal',height:380,paper_bgcolor:'#ffffff'});
+  Plotly.newPlot('g_bar',[{type:'bar',y:nz.map(r=>r.Goal),x:nz.map(r=>r.sip),orientation:'h',marker:{color:'#2563eb',line:{color:'#1e3a8a',width:1.2}}}],{title:'Monthly SIP Burden by Goal',height:380,paper_bgcolor:'#ffffff',xaxis:{gridcolor:'#dbeafe'},yaxis:{gridcolor:'#eff6ff'}});
   const sorted=[...rows].sort((a,b)=>a.years-b.years); let c=0; const cum=sorted.map(r=>{c+=r.future;return c;});
-  Plotly.newPlot('g_area',[{type:'scatter',mode:'lines',fill:'tozeroy',x:sorted.map(r=>r.years),y:cum}],{title:'Cumulative Corpus Required Over Time',height:340});
+  Plotly.newPlot('g_area',[{type:'scatter',mode:'lines+markers',fill:'tozeroy',x:sorted.map(r=>r.years),y:cum,line:{color:'#7c3aed',width:3},fillcolor:'rgba(124,58,237,0.2)'}],{title:'Cumulative Corpus Required Over Time',height:340,paper_bgcolor:'#ffffff',xaxis:{gridcolor:'#e2e8f0'},yaxis:{gridcolor:'#e2e8f0'}});
 
   const maxYear=Math.max(...rows.map(r=>r.years));
   const yw=document.getElementById('year_wrap');
   if(maxYear>0){ const yrows=[]; for(let y=1;y<=maxYear;y++){ const sip=rows.filter(r=>r.years>=y).reduce((a,b)=>a+b.sip,0); yrows.push({y,active:rows.filter(r=>r.years>=y).length,sip}); }
     yw.innerHTML=`<table class='table'><tr><th>Year</th><th>Active Goals</th><th>Total Monthly SIP (₹)</th><th>Annual Investment (₹)</th></tr>${yrows.map(r=>`<tr><td>${r.y}</td><td>${r.active}</td><td>${fmt(r.sip)}</td><td>${fmt(r.sip*12)}</td></tr>`).join('')}</table><div id='y_bar'></div>`;
-    Plotly.newPlot('y_bar',[{type:'bar',x:yrows.map(r=>r.y),y:yrows.map(r=>r.sip)}],{title:'Year-wise Monthly SIP Burden (All Active Goals)',height:330});
+    Plotly.newPlot('y_bar',[{type:'bar',x:yrows.map(r=>r.y),y:yrows.map(r=>r.sip),marker:{color:'#0ea5e9'}}],{title:'Year-wise Monthly SIP Burden (All Active Goals)',height:330,paper_bgcolor:'#ffffff',xaxis:{gridcolor:'#e2e8f0'},yaxis:{gridcolor:'#e2e8f0'}});
   } else yw.innerHTML='<p>Enter at least one goal with timeline to see Year-wise SIP schedule.</p>';
 }
 
@@ -138,8 +152,8 @@ function renderPlanning(){
   document.getElementById('plan_sip').onchange=()=>{state.sipAmount=num('plan_sip'); renderAll();};
   document.getElementById('add_in').onclick=()=>{state.lumpsumIn.push({year:num('in_year'),amount:num('in_amt'),label:document.getElementById('in_label').value}); renderAll();};
   document.getElementById('add_out').onclick=()=>{state.lumpsumOut.push({year:num('out_year'),amount:num('out_amt'),label:document.getElementById('out_label').value}); renderAll();};
-  Plotly.newPlot('p_line',[{type:'scatter',mode:'lines+markers',x:proj.map(x=>x.y),y:proj.map(x=>x.closing)}],{title:'Projected Portfolio Value (₹ in Cr)',height:340});
-  Plotly.newPlot('p_bar',[{type:'bar',x:proj.map(x=>x.y),y:proj.map(x=>x.sip+x.inflow-x.outflow)}],{title:'Year-wise Net Investment (₹)',height:340});
+  Plotly.newPlot('p_line',[{type:'scatter',mode:'lines+markers',x:proj.map(x=>x.y),y:proj.map(x=>x.closing),line:{color:'#10b981',width:3},marker:{size:7,color:'#047857'}}],{title:'Projected Portfolio Value (₹ in Cr)',height:340,paper_bgcolor:'#ffffff',xaxis:{gridcolor:'#e2e8f0'},yaxis:{gridcolor:'#e2e8f0'}});
+  Plotly.newPlot('p_bar',[{type:'bar',x:proj.map(x=>x.y),y:proj.map(x=>x.sip+x.inflow-x.outflow),marker:{color:'#f59e0b'}}],{title:'Year-wise Net Investment (₹)',height:340,paper_bgcolor:'#ffffff',xaxis:{gridcolor:'#e2e8f0'},yaxis:{gridcolor:'#e2e8f0'}});
 }
 
 function renderAll(){ renderProfile(); renderGoals(); renderPlanning(); }
